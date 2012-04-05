@@ -13,6 +13,17 @@
 typedef struct LLhead *list;
 typedef struct LL *litem;
 
+struct LLhead {
+    litem first;
+    litem last;
+    int size;
+};
+
+struct LL {
+    void *val;
+    litem next;
+};
+
 list LISTinit();
 #define LISTcallback LISTdump 
 void LISTdump(list, void (*valDumpFunc)(void*));

@@ -12,17 +12,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-struct LLhead {
-    litem first;
-    litem last;
-    int size;
-};
-
-struct LL {
-    void *val;
-    litem next;
-};
-
 list LISTinit() {
     list l;
     AUTOMALLOC(l);

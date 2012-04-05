@@ -15,7 +15,6 @@ struct Trecho {
     char tipo;
     int distancia;
 
-    pthread_mutex_t checkpoint_mutex;
     list checkpoint_ranking;
 };
 typedef struct Trecho *trecho;
@@ -26,13 +25,11 @@ trecho newTrecho(char tipo, int dist) {
     t->tipo = tipo;
     t->distancia = dist;
     t->checkpoint_ranking = LISTinit();
-    pthread_mutex_init(&t->checkpoint_mutex, NULL);
     return t;
 }
 void destroyTrecho(void* tv) {
     trecho t = (trecho) tv;
     LISTdestroy(t->checkpoint_ranking);
-    pthread_mutex_destroy(&t->checkpoint_mutex);
 }
 void dumpTrecho(void* tv) {
     trecho t = (trecho) tv;
@@ -41,14 +38,15 @@ void dumpTrecho(void* tv) {
 
 #define CICLO_TIME 5
 
+/* Região das globais legais */
 int largura_estrada;
 int tamanho_estrada;
+char modo_simula;
 list trechos;
 
 /* Em particular, lista de ranking da camisa amarela. */
 pthread_mutex_t terminar_mutex;
 list ciclistas_terminaram;
-
 
 /* Temos d indíces em estrada, e cada índice pode possuir até n ciclistas. */
 struct KM {
@@ -62,22 +60,48 @@ double kmh2ms(double kmh) { return kmh / 3.6; }
 void* CiclistaThread(void* arg) {
     /* This is our thread. There are many like it, this is one is ours. */
     ciclista c = (ciclista) arg;
+    double vel;
 
     /* Ciclista ja terminou a corrida. Nao corre mais poar. */
     if(c->km >= tamanho_estrada) return NULL;
 
-    c->metros += kmh2ms(c->vel_plano) * CICLO_TIME;
+    if(modo_simula) {
+        char tipo = c->trecho_atual ? ((trecho)c->trecho_atual->val)->tipo :
+            ((trecho)trechos->first->val)->tipo;
+        switch(tipo) {
+        case 'P': vel = c->vel_plano; break;
+        case 'S': vel = c->vel_subida; break;
+        case 'D': vel = c->vel_descida; break;
+        default: vel = 0.0;
+        }
+    } else {
+        vel = c->vel_plano;
+    }
+
+    c->metros += kmh2ms(vel) * CICLO_TIME;
+
+    /* Precisa mudar de KM? */
     if(c->metros >= 1000) {
 
+        /* Estou terminando a corrida? */
         if(c->km + 1 >= tamanho_estrada) {
             /* YEAH TERMINEI! */
+
+            /* Pega lock pra colocar na lista dos que terminaram. */
             pthread_mutex_lock(&terminar_mutex);
             LISTaddEnd(ciclistas_terminaram, c);
             pthread_mutex_unlock(&terminar_mutex);
 
+            /* Pega lock para se tirar da lista de quem tava no ultimo km. 
+                Esse lock também me permite modificar a lista do trecho, que termina nesse mesmo km. */
             pthread_mutex_lock(  &estrada[c->km].mutex);
             LISTremove(estrada[c->km].ciclistas, c);
+
+            /* Eu certamente terminei o último trecho. */
+            LISTaddEnd(((trecho) trechos->last->val)->checkpoint_ranking, c);
+
             pthread_mutex_unlock(&estrada[c->km].mutex);
+
 
             c->km++;
             c->metros -= 1000;
@@ -85,6 +109,7 @@ void* CiclistaThread(void* arg) {
             return NULL;
         }
 
+        /* Pega lock para Ler e possívelmente escrever no próximo KM. */
         pthread_mutex_lock(&estrada[c->km + 1].mutex);
         if(LISTsize(estrada[c->km + 1].ciclistas) < largura_estrada) {
 
@@ -92,12 +117,30 @@ void* CiclistaThread(void* arg) {
             LISTaddEnd(estrada[c->km + 1].ciclistas, c);
             pthread_mutex_unlock(&estrada[c->km + 1].mutex);
 
+            c->kms_no_trecho++;
+
             if(c->km >= 0) {
-                /* Se eu não estou no limbo de começo de corrida, vou me tirar da lista do km anterior. 
-                    Preciso travar o mutex senão da merda. */
+                trecho trecho_atual = (trecho) c->trecho_atual->val;
+
+                /* Se eu não estou no limbo de começo de corrida...
+                    1. vou me tirar da lista do km anterior. Preciso travar o mutex senão da merda. 
+                    2. Preciso ver se eu estou terminando algum trecho.
+                     -> Se sim, o mesmo lock do km me permite mexer nesse mutex.
+                    */
+
                 pthread_mutex_lock(  &estrada[c->km].mutex);
                 LISTremove(estrada[c->km].ciclistas, c);
+                if(c->kms_no_trecho == trecho_atual->distancia) {
+                    /* Opa, terminei o meu trecho! :D */
+                    LISTaddEnd(trecho_atual->checkpoint_ranking, c);
+                    c->trecho_atual = c->trecho_atual->next;
+                    c->kms_no_trecho = 0;
+                }
                 pthread_mutex_unlock(&estrada[c->km].mutex);
+            } else {
+                /* Estou começando a corrida agora. */
+                c->trecho_atual = trechos->first;
+                c->kms_no_trecho = 0;
             }
 
             /* Tudo ok, atualiza variaveis. */
@@ -105,7 +148,6 @@ void* CiclistaThread(void* arg) {
             c->metros -= 1000;
 
         } else {
-
             /* Fico parado esperando abrir espaço. Tomando cuidado pra não dormir.
                 Tb libero o lock. */
             pthread_mutex_unlock(&estrada[c->km + 1].mutex);
@@ -115,15 +157,26 @@ void* CiclistaThread(void* arg) {
     return NULL;
 }
 
+double randRange(double min, double max) {
+    return min + (rand() / (double)RAND_MAX) * (max - min);
+}
+
 ciclista NewCiclista(int id) {
     ciclista c;
     AUTOMALLOC(c);
     c->id = id;
     c->km = -1;
     c->metros = 1000;
+    c->trecho_atual = NULL;
+    c->kms_no_trecho = 0;
     AUTOMALLOCV(c->nome, strlen("Ciclista") + 1);
     strcpy(c->nome, "Ciclista");
-    c->vel_descida = c->vel_plano = c->vel_subida = 50.0;
+    if(modo_simula) {
+        c->vel_descida = randRange(20.0, 80.0);
+        c->vel_plano   = randRange(20.0, 80.0);
+        c->vel_subida  = randRange(20.0, 80.0);
+    } else 
+        c->vel_descida = c->vel_plano = c->vel_subida = 50.0;
     return c;
 }
 
@@ -138,9 +191,10 @@ int main(int argc, char **argv) {
     int ciclo = 0;
     FILE* in;
     int num_ciclistas;
-    char modo_simula;
     ciclista* ciclistas;
     pthread_t* ciclistas_threads;
+
+    srand((unsigned int) time(NULL));
 
     if(argc != 2) { 
         fprintf(stderr, "Uso: %s arquivo\n", argv[0]); 
@@ -205,13 +259,14 @@ int main(int argc, char **argv) {
         if(ciclo % (60 / CICLO_TIME) == 0) {
             printf("Minuto %d:\n", ciclo / (60 / CICLO_TIME));
             for(i = 0; i < tamanho_estrada; ++i) {
-                /* POG PRA LEGIBILIDADE. TIRAR ANTES DE ENTREGAR. NÃO ESQUECER */
-                if(LISTsize(estrada[i].ciclistas) == 0) continue;
+                /* POG PRA LEGIBILIDADE. TIRAR ANTES DE ENTREGAR. NÃO ESQUECER
+                if(LISTsize(estrada[i].ciclistas) == 0) continue;*/
                 printf("\tKM %.3d: ", i);
                 LISTdump(estrada[i].ciclistas, dumpCiclista);
                 puts("");
             }
             puts("");
+            fgetc(stdin);
         }
         for(i = 0; i < num_ciclistas; ++i) {
             int rc = pthread_create(&ciclistas_threads[i], NULL, CiclistaThread, (void *) ciclistas[i]);
@@ -224,7 +279,22 @@ int main(int argc, char **argv) {
         ciclo++;
     }
 
+    puts("Ranking de Tempo:");
     LISTdump(ciclistas_terminaram, dumpCiclista);
+    puts("");
+
+    {
+        litem p;
+        i = 0;
+        for(p = trechos->first; p; p = p->next) {
+            trecho t = (trecho) p->val;
+            printf("Ranking do checkpoint %d:\n", i);
+            LISTdump(t->checkpoint_ranking, dumpCiclista);
+            puts("");
+            i++;
+        }
+    }
+
 
     LISTdestroy(ciclistas_terminaram);
     pthread_mutex_destroy(&terminar_mutex);
