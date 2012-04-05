@@ -28,7 +28,7 @@ struct KM {
     list ciclistas;
 };
 
-#define CICLO_TIME 5.0
+#define CICLO_TIME 5
 
 int largura_estrada;
 int tamanho_estrada;
@@ -114,7 +114,7 @@ ciclista NewCiclista(int id) {
 
 void dumpCiclista(void* val) {
     ciclista c = (ciclista) val;
-    printf("%s %.2d\n", c->nome, c->id);
+    printf("[%s %.2d] ", c->nome, c->id);
 }
  
 /* O grande main incomming. Se vira ae champz. */
@@ -186,10 +186,16 @@ int main(int argc, char **argv) {
 
     while(LISTsize(ciclistas_terminaram) < num_ciclistas) { /* Execute ciclos até o fim! */
         /* Isso é um ciclo. */
-        if(ciclo % 10 == 0) {
-            printf("Ciclo %d:\n", ciclo);
-            for(i = 0; i < num_ciclistas; ++i)
-                printf("\t%s %.2d: km %d; %.1f metros\n", ciclistas[i]->nome, ciclistas[i]->id, ciclistas[i]->km, ciclistas[i]->metros);
+        if(ciclo % (60 / CICLO_TIME) == 0) {
+            printf("Minuto %d:\n", ciclo / (60 / CICLO_TIME));
+            for(i = 0; i < tamanho_estrada; ++i) {
+                /* POG PRA LEGIBILIDADE. TIRAR ANTES DE ENTREGAR. NÃO ESQUECER */
+                if(LISTsize(estrada[i].ciclistas) == 0) continue;
+                printf("\tKM %.3d: ", i);
+                LISTdump(estrada[i].ciclistas, dumpCiclista);
+                puts("");
+            }
+            puts("");
         }
         for(i = 0; i < num_ciclistas; ++i) {
             int rc = pthread_create(&ciclistas_threads[i], NULL, CiclistaThread, (void *) ciclistas[i]);
