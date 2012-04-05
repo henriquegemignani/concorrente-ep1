@@ -3,7 +3,8 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <limits.h>
-#include "common.h"
+#include "libs/extra.h"
+#include "libs/LL.h"
 #include "ciclista.h"
 
 void MALLOC_DIE() { exit(404); }
@@ -66,8 +67,6 @@ typedef struct Trecho {
 
 /* O grande main incomming. Se vira ae champz. */
 int main(int argc, char **argv) {
-    ciclista* c;
-
     int i;
 
     FILE* in;
@@ -75,7 +74,7 @@ int main(int argc, char **argv) {
     int largura_estrada;
     char modo_simula;
     int tamanho_estrada;
-    trecho** trechos;
+    list trechos;
 
     if(argc != 2) { 
         fprintf(stderr, "Uso: %s arquivo\n", argv[0]); 
@@ -89,20 +88,29 @@ int main(int argc, char **argv) {
     }
 
     fscanf(in, "%d", &num_ciclistas);   /* m */
+    printf("num_ciclistas (m) = %d\n", num_ciclistas); 
     fscanf(in, "%d", &largura_estrada); /* n */
-    fscanf(in, "%c", &modo_simula);
+    printf("largura_estrada (n) = %d\n", largura_estrada);
+
+    do modo_simula = fgetc(in); while(modo_simula == '\n');
     if(modo_simula != 'U' && modo_simula != 'A') {
         fprintf(stderr, "Erro: Modo '%c' diferente de A e U.\n", modo_simula);
         return 3;
     }
     modo_simula = modo_simula == 'A';  /* 0 se uniforme, 1 se diferente */
+    printf("modo_simula = %d\n", modo_simula);
 
     fscanf(in, "%d", &tamanho_estrada); /* d */
-    for(i = 0; i < tamanho_estrada; i++) {
+    printf("tamanho_estrada (d) = %d\n", tamanho_estrada);
 
+    trechos = LISTinit();
+    while(!feof(in)) {
+        trecho* t;
+        AUTOMALLOC(t);
+        do t->tipo = fgetc(in); while(t->tipo == '\n');
+        fscanf(in, "%d", &t->distancia);
+        printf("Trecho: distancia = %d, tipo = %c\n", t->distancia, t->tipo);
+        trechos = LISTaddEnd(trechos, t);
     }
-
-    AUTOMALLOC(c);
-    free(c);
     return 0;
 }
