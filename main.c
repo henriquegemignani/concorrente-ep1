@@ -190,8 +190,6 @@ int main(int argc, char **argv) {
             printf("Ciclo %d:\n", ciclo);
             for(i = 0; i < num_ciclistas; ++i)
                 printf("\t%s %.2d: km %d; %.1f metros\n", ciclistas[i]->nome, ciclistas[i]->id, ciclistas[i]->km, ciclistas[i]->metros);
-
-            fgetchar();
         }
         for(i = 0; i < num_ciclistas; ++i) {
             int rc = pthread_create(&ciclistas_threads[i], NULL, CiclistaThread, (void *) ciclistas[i]);
