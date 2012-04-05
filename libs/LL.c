@@ -30,9 +30,6 @@ list LISTinit() {
     l->size = 0;
     return l;
 }
-void* LISTval(litem l) {
-    return l->val;
-}
 void LISTdump(list l, void (*valDumpFunc)(void*)) {
     litem p;
     for( p = l->first; p != NULL; p = p->next)

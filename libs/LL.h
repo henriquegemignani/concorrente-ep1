@@ -14,9 +14,7 @@ typedef struct LLhead *list;
 typedef struct LL *litem;
 
 list LISTinit();
-litem LISTnext(litem);
-void LISTsetNext(litem l, litem n);
-void* LISTval(litem);
+#define LISTcallback LISTdump 
 void LISTdump(list, void (*valDumpFunc)(void*));
 int  LISTsize(list);
 

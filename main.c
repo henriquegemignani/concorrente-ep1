@@ -8,25 +8,36 @@
 #include "libs/LL.h"
 #include "ciclista.h"
 
-#define new AUTOMALLOC
-
 /* Nosso extra.h precisa desse codigo maroto. */
 void MALLOC_DIE() { exit(404); }
 
-typedef struct Trecho {
+struct Trecho {
     char tipo;
     int distancia;
-} trecho;
 
+    pthread_mutex_t checkpoint_mutex;
+    list checkpoint_ranking;
+};
+typedef struct Trecho *trecho;
+
+trecho newTrecho(char tipo, int dist) {
+    trecho t;
+    AUTOMALLOC(t);
+    t->tipo = tipo;
+    t->distancia = dist;
+    t->checkpoint_ranking = LISTinit();
+    pthread_mutex_init(&t->checkpoint_mutex, NULL);
+    return t;
+}
+void destroyTrecho(void* tv) {
+    trecho t = (trecho) tv;
+    LISTdestroy(t->checkpoint_ranking);
+    pthread_mutex_destroy(&t->checkpoint_mutex);
+}
 void dumpTrecho(void* tv) {
-    trecho* t = (trecho*) tv;
+    trecho t = (trecho) tv;
     printf("Trecho: distancia = %d, tipo = %c\n", t->distancia, t->tipo);
 }
-
-struct KM {
-    pthread_mutex_t mutex;
-    list ciclistas;
-};
 
 #define CICLO_TIME 5
 
@@ -34,15 +45,19 @@ int largura_estrada;
 int tamanho_estrada;
 list trechos;
 
+/* Em particular, lista de ranking da camisa amarela. */
 pthread_mutex_t terminar_mutex;
 list ciclistas_terminaram;
 
+
 /* Temos d indíces em estrada, e cada índice pode possuir até n ciclistas. */
+struct KM {
+    pthread_mutex_t mutex;
+    list ciclistas;
+};
 struct KM* estrada;
 
-double kmh2ms(double kmh) {
-    return kmh / 3.6;
-}
+double kmh2ms(double kmh) { return kmh / 3.6; }
 
 void* CiclistaThread(void* arg) {
     /* This is our thread. There are many like it, this is one is ours. */
@@ -171,11 +186,12 @@ int main(int argc, char **argv) {
 
     trechos = LISTinit();
     while(!feof(in)) {
-        trecho* t;
-        AUTOMALLOC(t);
-        do t->tipo = fgetc(in); while(t->tipo == '\n');
-        fscanf(in, "%d", &t->distancia);
-        LISTaddEnd(trechos, t);
+        char tipo;
+        int dist;
+        do tipo = fgetc(in); while(tipo == '\n');
+        fscanf(in, "%d", &dist);
+
+        LISTaddEnd(trechos, newTrecho(tipo, dist));
     }
     LISTdump(trechos, dumpTrecho);
     for(i = 0; i < num_ciclistas; ++i)
@@ -213,6 +229,8 @@ int main(int argc, char **argv) {
     LISTdestroy(ciclistas_terminaram);
     pthread_mutex_destroy(&terminar_mutex);
 
+    /* for trecho in trechos free */
+    LISTcallback(trechos, destroyTrecho);
     LISTdestroy(trechos);
     for(i = 0; i < num_ciclistas; ++i)
         free(ciclistas[i]);
