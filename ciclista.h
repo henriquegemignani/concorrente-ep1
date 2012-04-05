@@ -4,6 +4,7 @@
 struct Ciclista {
     int id;
     char *nome;
+    int km;
     double metros;
     double vel_plano;
     double vel_subida;

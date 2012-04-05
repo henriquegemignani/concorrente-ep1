@@ -12,157 +12,102 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-struct LL {
-    void *val;
-    list next;
+struct LLhead {
+    litem first;
+    litem last;
+    int size;
 };
 
-list LISTnext(list l) {
-    return l->next;
+struct LL {
+    void *val;
+    litem next;
+};
+
+list LISTinit() {
+    list l;
+    AUTOMALLOC(l);
+    l->first = l->last = NULL;
+    l->size = 0;
+    return l;
 }
-void LISTsetNext(list l, list n) {
-    l->next = n;
-}
-void* LISTval(list l) {
+void* LISTval(litem l) {
     return l->val;
 }
 void LISTdump(list l, void (*valDumpFunc)(void*)) {
-    list p;
-    for( p = l; p != NULL; l = p) {
-        p = p->next;
-        valDumpFunc(l->val);
-        if( p != NULL ) printf(" -> ");
-    }
+    litem p;
+    for( p = l->first; p != NULL; p = p->next)
+        valDumpFunc(p->val);
 }
 
+int LISTsize(list l) {
+    return l->size;
+}
 
-int LISTremove(list l, void (*valRemoveFunc)(void*)) {
-    if( l == NULL ) return 1;
-    if(valRemoveFunc) valRemoveFunc(l->val);
+void LISTdestroy(list l) {
+    litem p, tmp;
+    for(p = l->first; p != NULL; p = tmp) {
+        tmp = p->next;
+        free(p);
+    }
     free(l);
-    return 0;
 }
-int LISTremoveNext(list l, void (*valRemoveFunc)(void*)) {
-    if( l->next == NULL ) return 1;
-    if(valRemoveFunc) valRemoveFunc(l->next->val);
-    free(l->next);
-    l->next = NULL;
-    return 0;
-}
-int LISTdestroy(list l, void (*valRemoveFunc)(void*)) {
-    list p;
-    for( p = l; p != NULL; l = p) {
-        p = p->next;
-        if(valRemoveFunc) valRemoveFunc(l->val);
-        free(l);
+void LISTremove(list l, void* val) {
+    litem p, tmp;
+    if(!l->first) return;
+    if(l->first->val == val) {
+        tmp = l->first;
+        l->first = tmp->next;
+        if(l->last == tmp) l->last = NULL;
+        free(tmp);
+        --l->size;
+        return;
     }
-    return 0;
+    for(p = l->first; p->next; p = p->next )
+        if( p->next->val == val ) {
+            tmp = p->next;
+            if(tmp == l->last)
+                l->last = p;
+            p->next = tmp->next;
+            free(tmp);
+            --l->size;
+            return;
+        }
 }
 
-list LISTcreate(void *val, list next) {
-    list l; AUTOMALLOC(l);
+litem LISTcreate(void *val, litem next) {
+    litem l; AUTOMALLOC(l);
     l->val = val;
     l->next = next;
     return l;
 }
-list LISTaddNext(list l, void *val) {
-    list n = LISTcreate(val, NULL);
-    if( l == NULL ) return n;
-    n->next = l->next;
-    l->next = n;
-    return l;
-}
-list LISTaddEnd(list l, void *val) {
-    list p, n = LISTcreate(val, NULL);
-    if( !l ) return n;
-    for( p = l; p->next; p = p->next );
-    p->next = n;
-    return l;
-}
-
-list LISTcreateMergeOrdered(list l, list p, int (*valCompareFunc)(void*, void*)) {
-    list q = l, r = p, resp = NULL;
-    int i;
-    while( q && r ) {
-        i = valCompareFunc(q->val, r->val);
-        if( i >= 0 ) {
-            if( !LISTcontains(resp, r->val, valCompareFunc) )
-                resp = LISTaddEnd(resp, r->val);
-            r = r->next;
-            if( i == 0 )
-                q = q->next;
-        } else if( i < 0 ) {
-            if( !LISTcontains(resp, q->val, valCompareFunc) )
-                resp = LISTaddEnd(resp, q->val);
-            q = q->next;
-        }
-    }
-    for( ; q != NULL; q = q->next )
-        resp = LISTaddEnd(resp, q->val);
-    for( ; r != NULL; r = r->next )
-        resp = LISTaddEnd(resp, r->val);
-    return resp;
-}
-
-list LISTcreateIntersection(list l, list p, int (*valCompareFunc)(void*, void*)) {
-    list q, resp = NULL;
-    if( !l || !p ) return NULL;
-    for( q = l; q; q = q->next ) {
-        if( LISTcontains( p, q->val, valCompareFunc) && !LISTcontains( resp, q->val, valCompareFunc) )
-            resp = LISTaddEnd(resp, q->val);
-    }
-    return resp;
-}
-list LISTcreateDifference(list l, list p, int (*valCompareFunc)(void*, void*)) {
-    list q, resp = NULL;
-    if( !l || !p ) return NULL;
-    for( q = l; q; q = q->next )
-        if( !LISTcontains( p, q->val, valCompareFunc) && !LISTcontains( resp, q->val, valCompareFunc) )
-            resp = LISTaddEnd(resp, q->val);
-    return resp;
-}
-
-/* Insere LIST n no final da lista RESP->...->END
- Uso interno apenas. */
-list LISTcopyAUX(list resp, list *end, list n) {
-    if( resp == NULL ) {
-        *end = n;
-        return n;
-    }
-    (*end)->next = n;
-    *end = n;
-    return resp;
-}
-list LISTcopy(list l) {
-    list p, n, resp = NULL, end = NULL;
-    for( p = l; p; p = p->next ) {
-        n = LISTcreate( p->val, NULL );
-        resp = LISTcopyAUX(resp, &end, n);
-    }
-    return resp;
-}
-
-
-list LISTinvertOrderR(list *l) {
-    list p;
-    if( *l == NULL || (*l)->next == NULL ) {
-        return *l;
+litem LISTaddStart(list l, void *val) {
+    litem n = LISTcreate(val, NULL);
+    if( l->first == NULL ) {
+        /* Lista l está vazia. */
+        l->first = l->last = n;
     } else {
-        p = *l;
-        *l = p->next;
-        LISTinvertOrderR(l)->next = p;
-        p->next = NULL;
-        return p;
+        n->next = l->first;
+        l->first = n;
     }
+    l->size++;
+    return n;
 }
-void LISTinvertOrder(list *l) {
-    LISTinvertOrderR(l);
+litem LISTaddEnd(list l, void *val) {
+    litem n = LISTcreate(val, NULL);
+    if( l->first == NULL ) {
+        l->first = l->last = n;
+    } else {
+        l->last->next = n;
+        l->last = n;
+    }
+    l->size++;
+    return n;
 }
 
-int LISTcontains(list l, void* val, int (*valCompareFunc)(void*, void*)) {
-    list p;
-    for( p = l; p; p = p->next )
-        if( valCompareFunc( p->val, val ) == 0 )
+int LISTcontains(list l, void* val) {
+    litem p;
+    for( p = l->first; p; p = p->next )
+        if( p->val == val )
             return 1;
     return 0;
 }

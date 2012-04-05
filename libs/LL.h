@@ -10,43 +10,25 @@
 #ifndef LL_H_
 #define LL_H_
 
-typedef struct LL *list;
+typedef struct LLhead *list;
+typedef struct LL *litem;
 
-#define LISTinit() NULL
-list LISTnext(list);
-void LISTsetNext(list l, list n);
-void* LISTval(list);
+list LISTinit();
+litem LISTnext(litem);
+void LISTsetNext(litem l, litem n);
+void* LISTval(litem);
 void LISTdump(list, void (*valDumpFunc)(void*));
-#define LISTempty(l) (l == NULL)
+int  LISTsize(list);
 
 /* Removal */
-int LISTremove(list, void (*valRemoveFunc)(void*));
-int LISTremoveNext(list, void (*valRemoveFunc)(void*));
-int LISTdestroy(list, void (*valRemoveFunc)(void*));
+void LISTdestroy(list);
+void LISTremove(list, void* val);
 
 
 /* Insertion */
-list LISTaddNext(list, void *);
-list LISTaddEnd(list, void *);
+litem LISTaddStart(list, void *);
+litem LISTaddEnd(list, void *);
 
-/* Cria uma nova lista onde todos os valores dela pertence a L ou P. */
-list LISTcreateMergeOrdered(list l, list p, int (*valCompareFunc)(void*, void*));
-
-/* Cria uma nova lista onde todos os valores dela pertence a L e P. */
-list LISTcreateIntersection(list l, list p, int (*valCompareFunc)(void*, void*));
-
-/* Cria uma nova lista onde todos os valores dela pertence a L mas nao P. */
-list LISTcreateDifference(list l, list p, int (*valCompareFunc)(void*, void*));
-
-/* Devolve uma copia da lista dada.*/
-list LISTcopy(list l);
-
-/* Dado uma lista A->B->...->C->D, inverte tal lista para D->C->...->B->A */
-void LISTinvertOrder(list *l);
-
-/* Content */
-/* Devolve 1 se valCompareFunc devolver 0 para algum par (val,listval),
- com listval pertencente a lista l. */
- int LISTcontains(list l, void* val, int (*valCompareFunc)(void*, void*));
+int LISTcontains(list l, void* val);
 
 #endif
