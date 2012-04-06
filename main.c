@@ -228,14 +228,24 @@ double randRange(double min, double max) {
     return min + (rand() / (double)RAND_MAX) * (max - min);
 }
 
+char* geraNome(int id) {
+    char* resp;
+    char buffer[32];
+
+    sprintf(buffer, "%d", id);
+
+    AUTOMALLOCV(resp, strlen("Ciclista ") + strlen(buffer) + 1);
+    strcpy(resp, "Ciclista ");
+    strcpy(resp + strlen(resp), buffer);
+    return resp;
+}
+
 ciclista newCiclista(int id) {
     ciclista c;
     AUTOMALLOC(c);
     
-    AUTOMALLOCV(c->nome, strlen("Ciclista") + 1);
-    strcpy(c->nome, "Ciclista");
-
     c->id = id;
+    c->nome = geraNome(id);
     c->km = -1;
     c->metros = 1000;
     c->trecho_atual = NULL;
@@ -264,13 +274,30 @@ void destroyCiclista(ciclista c) {
 
 void dumpCiclista(void* val) {
     ciclista c = (ciclista) val;
-    printf("[%s %.2d; %.2lf m] ", c->nome, c->id, c->metros);
+#ifdef DEBUG
+    printf("[%s (%.3d); %.2lf m] ", c->nome, c->id, c->metros);
+#else
+    printf("[%s] ", c->nome);
+#endif
 }
- 
+
+list readTrechos(FILE* in) {
+    char tipo;
+    int dist;
+    list resp = LISTinit();
+
+    while(!feof(in)) {
+        do tipo = fgetc(in); while(tipo == '\n');
+        fscanf(in, "%d", &dist);
+        LISTaddEnd(resp, newTrecho(tipo, dist));
+    }
+    return resp;
+}
+
 /* O grande main incomming. Se vira ae champz. */
 int main(int argc, char **argv) {
     int i;
-    int ciclo = 0;
+    int ciclo;
     FILE* in;
     int num_ciclistas;
     ciclista* ciclistas;
@@ -278,8 +305,6 @@ int main(int argc, char **argv) {
     pthread_attr_t ciclista_attr;
 
     srand((unsigned int) time(NULL));
-
-    /*freopen("saida.txt", "w", stdout);*/
 
     if(argc != 2) { 
         fprintf(stderr, "Uso: %s arquivo\n", argv[0]); 
@@ -293,55 +318,40 @@ int main(int argc, char **argv) {
     }
 
     fscanf(in, "%d", &num_ciclistas);   /* m */
-    printf("num_ciclistas (m) = %d\n", num_ciclistas); 
+    fscanf(in, "%d", &largura_estrada); /* n */
+    do modo_simula = fgetc(in); while(modo_simula == '\n');
+    fscanf(in, "%d", &tamanho_estrada); /* d */
+        
+    trechos = readTrechos(in);
+    fclose(in);
+    
+#ifdef DEBUG
+    printf("num_ciclistas (m) = %d\n", num_ciclistas);
+    printf("largura_estrada (n) = %d\n", largura_estrada);
+    printf("modo_simula = %c\n", modo_simula);
+    printf("tamanho_estrada (d) = %d\n", tamanho_estrada);
+    LISTdump(trechos, dumpTrecho);
+
+    assert(largura_estrada >= 2);
+    assert(modo_simula == 'U' || modo_simula == 'A');
+#endif
 
     AUTOMALLOCV(ciclistas, num_ciclistas);
     AUTOMALLOCV(ciclistas_threads, num_ciclistas);
-
-    fscanf(in, "%d", &largura_estrada); /* n */
-    printf("largura_estrada (n) = %d\n", largura_estrada);
-    assert(largura_estrada >= 2);
-
-    do modo_simula = fgetc(in); while(modo_simula == '\n');
-    if(modo_simula != 'U' && modo_simula != 'A') {
-        fprintf(stderr, "Erro: Modo '%c' diferente de A e U.\n", modo_simula);
-        return 3;
-    }
-    modo_simula = modo_simula == 'A';  /* 0 se uniforme, 1 se diferente */
-    printf("modo_simula = %d\n", modo_simula);
-
-    fscanf(in, "%d", &tamanho_estrada); /* d */
-    printf("tamanho_estrada (d) = %d\n", tamanho_estrada);
-
-    /* Inicializa o vetor estrada. */
     AUTOMALLOCV(estrada, tamanho_estrada);
-    for(i = 0; i < tamanho_estrada; ++i) {
+    for(i = 0; i < tamanho_estrada; ++i) { /* Inicializa o vetor estrada. */
         estrada[i].ciclistas = LISTinit();
         pthread_mutex_init(&estrada[i].mutex, NULL);
     }
-
     ciclistas_terminaram = LISTinit();
     pthread_mutex_init(&terminar_mutex, NULL);
-    
+    modo_simula = modo_simula == 'A'; /* 0 se uniforme, 1 se diferente */
 
-    trechos = LISTinit();
-    while(!feof(in)) {
-        char tipo;
-        int dist;
-        do tipo = fgetc(in); while(tipo == '\n');
-        fscanf(in, "%d", &dist);
-
-        LISTaddEnd(trechos, newTrecho(tipo, dist));
-    }
-    fclose(in);
-
-
-    LISTdump(trechos, dumpTrecho);
     for(i = 0; i < num_ciclistas; ++i)
         ciclistas[i] = newCiclista(i);
 
     for(i = 0; i < num_ciclistas; ++i)
-        printf("%.2d: %s [%.2lf; %.2lf; %.2lf]\n", i, ciclistas[i]->nome, ciclistas[i]->vel_descida, ciclistas[i]->vel_plano, ciclistas[i]->vel_subida);
+        printf("%s [%.2lf; %.2lf; %.2lf]\n", ciclistas[i]->nome, ciclistas[i]->vel_descida, ciclistas[i]->vel_plano, ciclistas[i]->vel_subida);
 
 
     pthread_attr_init(&ciclista_attr);
@@ -405,14 +415,14 @@ int main(int argc, char **argv) {
     quickSortCiclistaVerde(ciclistas, num_ciclistas);
     puts("Ranking da Camisa Verde:");
     for(i = 0; i < num_ciclistas; ++i)
-        printf("Pos %.2d: %s %.2d - Pontos: %d\n", i, ciclistas[i]->nome, ciclistas[i]->id, ciclistas[i]->ponto_verde);
+        printf("Pos %.2d: %s - Pontos: %d\n", i, ciclistas[i]->nome, ciclistas[i]->ponto_verde);
 
     puts("");
 
     quickSortCiclistaBrancoVermelho(ciclistas, num_ciclistas);
     puts("Ranking da Camisa Branco com Bolas Vermelhas:");
     for(i = 0; i < num_ciclistas; ++i)
-        printf("Pos %.2d: %s %.2d - Pontos: %d\n", i, ciclistas[i]->nome, ciclistas[i]->id, ciclistas[i]->ponto_verde);
+        printf("Pos %.2d: %s - Pontos: %d\n", i, ciclistas[i]->nome, ciclistas[i]->ponto_verde);
     
     LISTdestroy(ciclistas_terminaram);
     pthread_mutex_destroy(&terminar_mutex);
