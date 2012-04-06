@@ -132,6 +132,8 @@ void* CiclistaThread(void* arg) {
 
     /* Ciclista ja terminou a corrida. Nao corre mais poar. */
     while(c->km < tamanho_estrada) {
+        /* Espera o ciclo começar. */
+        sem_wait(&c->continua_ciclo);
         if(modo_simula) {
             char tipo = c->trecho_atual ? ((trecho)c->trecho_atual->val)->tipo :
                 ((trecho)trechos->first->val)->tipo;
@@ -218,7 +220,6 @@ void* CiclistaThread(void* arg) {
             }
         }
         sem_post(&c->terminou_ciclo);
-        sem_wait(&c->continua_ciclo);
     }
     return NULL;
 }
@@ -281,8 +282,7 @@ int main(int argc, char **argv) {
 
     if(argc != 2) { 
         fprintf(stderr, "Uso: %s arquivo\n", argv[0]); 
-        return 1; 
-
+        return 1;
     }
 
     in = fopen(argv[1], "r");
@@ -312,6 +312,7 @@ int main(int argc, char **argv) {
     fscanf(in, "%d", &tamanho_estrada); /* d */
     printf("tamanho_estrada (d) = %d\n", tamanho_estrada);
 
+    /* Inicializa o vetor estrada. */
     AUTOMALLOCV(estrada, tamanho_estrada);
     for(i = 0; i < tamanho_estrada; ++i) {
         estrada[i].ciclistas = LISTinit();
@@ -350,12 +351,21 @@ int main(int argc, char **argv) {
         assert(0 == rc);
     }
 
-    while(1) {
+    /* Enquanto alguém não terminou a corrida. */
+    while(LISTsize(ciclistas_terminaram) < num_ciclistas) {
+        /* Manda todo mundo correr. */
         for(i = 0; i < num_ciclistas; ++i)
-            if(ciclistas[i]->km < tamanho_estrada) /* Só espera os ciclistas que tão correndo. */
+            sem_post(&ciclistas[i]->continua_ciclo);
+
+        /* Espera todo mundo que ainda não terminou a corrida acabar o ciclo. */
+        for(i = 0; i < num_ciclistas; ++i)
+            if(ciclistas[i]->km < tamanho_estrada)
                 sem_wait(&ciclistas[i]->terminou_ciclo);
 
-        /* Agora todos os ciclistas estão esperando o sinal. */
+        /* Acabamos de realizar um ciclo. */
+        ++ciclo;
+
+        /* Passou 1 minuto? */
         if(ciclo % (60 / CICLO_TIME) == 0) {
             printf("Minuto %d:\n", ciclo / (60 / CICLO_TIME));
             for(i = 0; i < tamanho_estrada; ++i) {
@@ -365,12 +375,6 @@ int main(int argc, char **argv) {
             }
             puts("");
         }
-        ciclo++;
-        for(i = 0; i < num_ciclistas; ++i)
-            sem_post(&ciclistas[i]->continua_ciclo);
-
-        if(LISTsize(ciclistas_terminaram) == num_ciclistas)
-            break;
     }
 
     puts("Ranking da Camisa Amarela:");
