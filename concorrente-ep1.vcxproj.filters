@@ -23,9 +23,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ciclista.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="libs\extra.h">
       <Filter>Header Files</Filter>
     </ClInclude>

@@ -60,6 +60,7 @@ int tamanho_estrada;
 char modo_simula;
 list trechos;
 pthread_cond_t ciclo_cond;
+pthread_mutex_t ciclo_mutex;
 
 /* Em particular, lista de ranking da camisa amarela. */
 pthread_mutex_t terminar_mutex;
@@ -170,7 +171,11 @@ void* CiclistaThread(void* arg) {
                 c->metros = 1000;
             }
         }
-        pthread_cond_wait(&ciclo_cond, &c->mutex);
+        pthread_mutex_unlock(&c->mutex);
+        pthread_mutex_lock(&ciclo_mutex);
+        pthread_cond_wait(&ciclo_cond, &ciclo_mutex);
+        pthread_mutex_unlock(&ciclo_mutex);
+        pthread_mutex_lock(&c->mutex);
     }
     pthread_mutex_unlock(&c->mutex);
     return NULL;
@@ -261,6 +266,7 @@ int main(int argc, char **argv) {
     pthread_mutex_init(&terminar_mutex, NULL);
 
     pthread_cond_init (&ciclo_cond, NULL);
+    pthread_mutex_init(&ciclo_mutex, NULL);
 
     trechos = LISTinit();
     while(!feof(in)) {
@@ -350,6 +356,7 @@ int main(int argc, char **argv) {
         pthread_mutex_destroy(&estrada[i].mutex);
     }
     free(estrada);
+    pthread_mutex_destroy(&ciclo_mutex);
     pthread_cond_destroy(&ciclo_cond);
     return 0;
 }
