@@ -89,6 +89,30 @@ litem LISTaddEnd(list l, void *val) {
     l->size++;
     return n;
 }
+litem LISTaddOrder(list l , void *val, int (*lessOp)(void*, void*)) {
+    litem n = LISTcreate(val, NULL);
+    if( l->first == NULL ) {
+        l->first = l->last = n;
+    } else {
+        if(lessOp(n->val, l->first->val)) {
+            n->next = l->first;
+            l->first = n;
+        } else {
+            litem p;
+            for(p = l->first; p->next; p = p->next) {
+                if(!lessOp(n->val, p->next->val))
+                    continue;
+                n->next = p->next;
+                p->next = n;
+                break;
+            }
+            if(!p->next) /* val não é menor que ninguém, insere no fim. */
+                p->next = l->last = n;
+        }
+    }
+    l->size++;
+    return n;
+}
 
 int LISTcontains(list l, void* val) {
     litem p;

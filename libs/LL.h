@@ -37,6 +37,8 @@ void LISTremove(list, void* val);
 /* Insertion */
 litem LISTaddStart(list, void *);
 litem LISTaddEnd(list, void *);
+/* lessOp returns 1 if first arg is lesser than second, 0 otherwise. */
+litem LISTaddOrder(list, void *, int (*lessOp)(void*, void*));
 
 int LISTcontains(list l, void* val);
 
