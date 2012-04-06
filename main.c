@@ -10,6 +10,12 @@
 /* Nosso extra.h precisa desse codigo maroto. */
 void MALLOC_DIE() { exit(404); }
 
+void swap(void** a, void** b) {
+  void* tmp = *a;
+  *a = *b;
+  *b = tmp;
+}
+
 struct Ciclista {
     int id;
     char *nome;
@@ -26,6 +32,48 @@ struct Ciclista {
     int ponto_branco_vermelho;
 };
 typedef struct Ciclista *ciclista;
+ 
+void quickSort(void* vec[], int left, int right, int (*partition)(void**, int, int)) {
+  int r;
+ 
+  if (right > left) {
+    r = partition(vec, left, right);
+    quickSort(vec, left, r - 1, partition);
+    quickSort(vec, r + 1, right, partition);
+  }
+}
+
+int partitionCiclistaVerde(ciclista vec[], int left, int right) {
+    int i = left, j;
+    for (j = left + 1; j <= right; ++j) {
+        if (vec[j]->ponto_verde > vec[left]->ponto_verde) {
+            ++i;
+            swap(&vec[i], &vec[j]);
+        }
+    }
+    swap(&vec[left], &vec[i]);
+    return i;
+}
+
+int partitionCiclistaBrancoVermelho(ciclista vec[], int left, int right) {
+    int i = left, j;
+    for (j = left + 1; j <= right; ++j) {
+        if (vec[j]->ponto_branco_vermelho > vec[left]->ponto_branco_vermelho) {
+            ++i;
+            swap(&vec[i], &vec[j]);
+        }
+    }
+    swap(&vec[left], &vec[i]);
+    return i;
+}
+
+void quickSortCiclistaVerde(ciclista vec[], int size) {
+    quickSort(vec, 0, size - 1, (int (*)(void**, int, int))partitionCiclistaVerde);
+}
+void quickSortCiclistaBrancoVermelho(ciclista vec[], int size) {
+    quickSort(vec, 0, size - 1, (int (*)(void**, int, int))partitionCiclistaBrancoVermelho);
+}
+
 
 struct Trecho {
     char tipo;
@@ -223,6 +271,8 @@ int main(int argc, char **argv) {
 
     srand((unsigned int) time(NULL));
 
+    freopen("saida.txt", "w", stdout);
+
     if(argc != 2) { 
         fprintf(stderr, "Uso: %s arquivo\n", argv[0]); 
         return 1; 
@@ -277,6 +327,9 @@ int main(int argc, char **argv) {
 
         LISTaddEnd(trechos, newTrecho(tipo, dist));
     }
+    fclose(in);
+
+
     LISTdump(trechos, dumpTrecho);
     for(i = 0; i < num_ciclistas; ++i)
         ciclistas[i] = NewCiclista(i);
@@ -317,7 +370,7 @@ int main(int argc, char **argv) {
     for(i = 0; i < num_ciclistas; ++i)
         pthread_mutex_unlock(&ciclistas[i]->mutex);
 
-    puts("Ranking de Tempo:");
+    puts("Ranking da Camisa Amarela:");
     LISTdump(ciclistas_terminaram, dumpCiclista);
     puts("");
 
@@ -339,6 +392,18 @@ int main(int argc, char **argv) {
         }
     }
 
+    quickSortCiclistaVerde(ciclistas, num_ciclistas);
+    puts("Ranking da Camisa Verde:");
+    for(i = 0; i < num_ciclistas; ++i)
+        printf("Pos %.2d: %s %.2d - Pontos: %d\n", i, ciclistas[i]->nome, ciclistas[i]->id, ciclistas[i]->ponto_verde);
+
+    puts("");
+
+    quickSortCiclistaBrancoVermelho(ciclistas, num_ciclistas);
+    puts("Ranking da Camisa Branco com Bolas Vermelhas:");
+    for(i = 0; i < num_ciclistas; ++i)
+        printf("Pos %.2d: %s %.2d - Pontos: %d\n", i, ciclistas[i]->nome, ciclistas[i]->id, ciclistas[i]->ponto_verde);
+    
 
     LISTdestroy(ciclistas_terminaram);
     pthread_mutex_destroy(&terminar_mutex);
