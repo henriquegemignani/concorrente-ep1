@@ -50,10 +50,10 @@ int partitionCiclistaVerde(ciclista vec[], int left, int right) {
     for (j = left + 1; j <= right; ++j) {
         if (vec[j]->ponto_verde > vec[left]->ponto_verde) {
             ++i;
-            swap(&vec[i], &vec[j]);
+            swap((void**)&vec[i], (void**)&vec[j]);
         }
     }
-    swap(&vec[left], &vec[i]);
+    swap((void**)&vec[left], (void**)&vec[i]);
     return i;
 }
 
@@ -62,18 +62,18 @@ int partitionCiclistaBrancoVermelho(ciclista vec[], int left, int right) {
     for (j = left + 1; j <= right; ++j) {
         if (vec[j]->ponto_branco_vermelho > vec[left]->ponto_branco_vermelho) {
             ++i;
-            swap(&vec[i], &vec[j]);
+            swap((void**)&vec[i], (void**)&vec[j]);
         }
     }
-    swap(&vec[left], &vec[i]);
+    swap((void**)&vec[left], (void**)&vec[i]);
     return i;
 }
 
 void quickSortCiclistaVerde(ciclista vec[], int size) {
-    quickSort(vec, 0, size - 1, (int (*)(void**, int, int))partitionCiclistaVerde);
+    quickSort((void**)vec, 0, size - 1, (int (*)(void**, int, int))partitionCiclistaVerde);
 }
 void quickSortCiclistaBrancoVermelho(ciclista vec[], int size) {
-    quickSort(vec, 0, size - 1, (int (*)(void**, int, int))partitionCiclistaBrancoVermelho);
+    quickSort((void**)vec, 0, size - 1, (int (*)(void**, int, int))partitionCiclistaBrancoVermelho);
 }
 
 
