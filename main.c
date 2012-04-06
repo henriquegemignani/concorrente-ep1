@@ -1,4 +1,5 @@
 ﻿#include <pthread.h>
+#include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -30,8 +31,8 @@ struct Ciclista {
     int ponto_verde;
     int ponto_branco_vermelho;
 
-    char terminou_ciclo;
-    char continua_ciclo;
+    sem_t terminou_ciclo;
+    sem_t continua_ciclo;
 };
 typedef struct Ciclista *ciclista;
  
@@ -170,6 +171,7 @@ void* CiclistaThread(void* arg) {
                 c->km++;
                 c->metros -= 1000;
 
+                sem_post(&c->terminou_ciclo);
                 break;
             }
 
@@ -218,9 +220,8 @@ void* CiclistaThread(void* arg) {
                 c->metros = 1000;
             }
         }
-        c->terminou_ciclo = 1;
-        while(c->continua_ciclo != 1);
-        c->continua_ciclo = 0;
+        sem_post(&c->terminou_ciclo);
+        sem_wait(&c->continua_ciclo);
     }
     return NULL;
 }
@@ -247,8 +248,8 @@ ciclista NewCiclista(int id) {
         c->vel_descida = c->vel_plano = c->vel_subida = 50.0;
     c->ponto_verde = 0;
     c->ponto_branco_vermelho = 0;
-    c->terminou_ciclo = 0;
-    c->continua_ciclo = 0;
+    sem_init(&c->terminou_ciclo, 0, 0);
+    sem_init(&c->continua_ciclo, 0, 0);
     return c;
 }
 
@@ -311,6 +312,7 @@ int main(int argc, char **argv) {
 
     ciclistas_terminaram = LISTinit();
     pthread_mutex_init(&terminar_mutex, NULL);
+    
 
     trechos = LISTinit();
     while(!feof(in)) {
@@ -341,12 +343,11 @@ int main(int argc, char **argv) {
     }
 
     while(1) {
-        for(i = 0; i < num_ciclistas; ++i) {
-            while(ciclistas[i]->terminou_ciclo != 1);
-            ciclistas[i]->terminou_ciclo = 0;
-        }
+        for(i = 0; i < num_ciclistas; ++i)
+            if(ciclistas[i]->km < tamanho_estrada) /* Só espera os ciclistas que tão correndo. */
+                sem_wait(&ciclistas[i]->terminou_ciclo);
+
         /* Agora todos os ciclistas estão esperando o sinal. */
-        
         if(ciclo % (60 / CICLO_TIME) == 0) {
             printf("Minuto %d:\n", ciclo / (60 / CICLO_TIME));
             for(i = 0; i < tamanho_estrada; ++i) {
@@ -357,10 +358,11 @@ int main(int argc, char **argv) {
             puts("");
         }
         ciclo++;
+        for(i = 0; i < num_ciclistas; ++i)
+            sem_post(&ciclistas[i]->continua_ciclo);
+
         if(LISTsize(ciclistas_terminaram) == num_ciclistas)
             break;
-        for(i = 0; i < num_ciclistas; ++i)
-            ciclistas[i]->continua_ciclo = 1;
     }
 
     puts("Ranking da Camisa Amarela:");
