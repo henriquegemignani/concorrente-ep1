@@ -275,6 +275,7 @@ int main(int argc, char **argv) {
     int num_ciclistas;
     ciclista* ciclistas;
     pthread_t* ciclistas_threads;
+    pthread_attr_t ciclista_attr;
 
     srand((unsigned int) time(NULL));
 
@@ -343,14 +344,15 @@ int main(int argc, char **argv) {
         printf("%.2d: %s [%.2lf; %.2lf; %.2lf]\n", i, ciclistas[i]->nome, ciclistas[i]->vel_descida, ciclistas[i]->vel_plano, ciclistas[i]->vel_subida);
 
 
-
-    ciclo = 0;
+    pthread_attr_init(&ciclista_attr);
+    pthread_attr_setdetachstate(&ciclista_attr, PTHREAD_CREATE_DETACHED);
 
     for(i = 0; i < num_ciclistas; ++i) {
-        int rc = pthread_create(&ciclistas_threads[i], NULL, CiclistaThread, (void *) ciclistas[i]);
+        int rc = pthread_create(&ciclistas_threads[i], &ciclista_attr, CiclistaThread, (void *) ciclistas[i]);
         assert(0 == rc);
     }
 
+    ciclo = 0;
     /* Enquanto alguém não terminou a corrida. */
     while(LISTsize(ciclistas_terminaram) < num_ciclistas) {
         /* Manda todo mundo correr. */
@@ -377,12 +379,8 @@ int main(int argc, char **argv) {
         }
     }
 
-    puts("Ranking da Camisa Amarela:");
-    LISTdump(ciclistas_terminaram, dumpCiclista);
-    puts("");
-
+    /* Para cada trecho, calcular pontuação dos ciclistas */
     {
-        /* Para cada trecho, calcular pontuação dos ciclistas */
         litem p;
         for(p = trechos->first; p; p = p->next) {
             trecho t = (trecho) p->val;
@@ -399,6 +397,11 @@ int main(int argc, char **argv) {
         }
     }
 
+    puts("Ranking da Camisa Amarela:");
+    LISTdump(ciclistas_terminaram, dumpCiclista);
+    
+    puts("");
+
     quickSortCiclistaVerde(ciclistas, num_ciclistas);
     puts("Ranking da Camisa Verde:");
     for(i = 0; i < num_ciclistas; ++i)
@@ -411,7 +414,6 @@ int main(int argc, char **argv) {
     for(i = 0; i < num_ciclistas; ++i)
         printf("Pos %.2d: %s %.2d - Pontos: %d\n", i, ciclistas[i]->nome, ciclistas[i]->id, ciclistas[i]->ponto_verde);
     
-
     LISTdestroy(ciclistas_terminaram);
     pthread_mutex_destroy(&terminar_mutex);
 
@@ -422,6 +424,8 @@ int main(int argc, char **argv) {
     for(i = 0; i < num_ciclistas; ++i)
         destroyCiclista(ciclistas[i]);
     free(ciclistas);
+
+    pthread_attr_destroy(&ciclista_attr);
     free(ciclistas_threads);
 
     for(i = 0; i < tamanho_estrada; ++i) {
