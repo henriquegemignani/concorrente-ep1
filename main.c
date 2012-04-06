@@ -27,6 +27,7 @@ struct Ciclista {
     double vel_plano;
     double vel_subida;
     double vel_descida;
+    int tempo_gasto_total;
 
     int ponto_verde;
     int ponto_branco_vermelho;
@@ -44,6 +45,18 @@ void quickSort(void* vec[], int left, int right, int (*partition)(void**, int, i
     quickSort(vec, left, r - 1, partition);
     quickSort(vec, r + 1, right, partition);
   }
+}
+
+int partitionCiclistaAmarelo(ciclista vec[], int left, int right) {
+    int i = left, j;
+    for (j = left + 1; j <= right; ++j) {
+        if (vec[j]->tempo_gasto_total < vec[left]->tempo_gasto_total) {
+            ++i;
+            swap((void**)&vec[i], (void**)&vec[j]);
+        }
+    }
+    swap((void**)&vec[left], (void**)&vec[i]);
+    return i;
 }
 
 int partitionCiclistaVerde(ciclista vec[], int left, int right) {
@@ -70,6 +83,9 @@ int partitionCiclistaBrancoVermelho(ciclista vec[], int left, int right) {
     return i;
 }
 
+void quickSortCiclistaAmarelo(ciclista vec[], int size) {
+    quickSort((void**)vec, 0, size - 1, (int (*)(void**, int, int))partitionCiclistaAmarelo);
+}
 void quickSortCiclistaVerde(ciclista vec[], int size) {
     quickSort((void**)vec, 0, size - 1, (int (*)(void**, int, int))partitionCiclistaVerde);
 }
@@ -147,6 +163,7 @@ void* CiclistaThread(void* arg) {
             vel = c->vel_plano;
         }
 
+        c->tempo_gasto_total += CICLO_TIME;
         c->metros += kmh2ms(vel) * CICLO_TIME;
 
         /* Precisa mudar de KM? */
@@ -250,6 +267,7 @@ ciclista newCiclista(int id) {
     c->metros = 1000;
     c->trecho_atual = NULL;
     c->kms_no_trecho = 0;
+    c->tempo_gasto_total = 0;
 
     if(modo_simula) {
         c->vel_descida = randRange(20.0, 80.0);
@@ -389,8 +407,10 @@ int main(int argc, char **argv) {
         }
     }
 
-    /* Para cada trecho, calcular pontuação dos ciclistas */
+    /* Calcular pontuação dos ciclistas */
     {
+
+        /* Itera por todos os trechos, e distribui pontuação dos checkpoints. */
         litem p;
         for(p = trechos->first; p; p = p->next) {
             trecho t = (trecho) p->val;
@@ -407,9 +427,11 @@ int main(int argc, char **argv) {
         }
     }
 
+    quickSortCiclistaAmarelo(ciclistas, num_ciclistas);
     puts("Ranking da Camisa Amarela:");
-    LISTdump(ciclistas_terminaram, dumpCiclista);
-    
+    for(i = 0; i < num_ciclistas; ++i)
+        printf("Pos %.2d: %s - Tempo: %d:%.2d:%.2d\n", i, ciclistas[i]->nome, ciclistas[i]->tempo_gasto_total / 3600, (ciclistas[i]->tempo_gasto_total % 3600) / 60, ciclistas[i]->tempo_gasto_total % 60);
+
     puts("");
 
     quickSortCiclistaVerde(ciclistas, num_ciclistas);
