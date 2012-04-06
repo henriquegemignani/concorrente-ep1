@@ -26,10 +26,12 @@ struct Ciclista {
     double vel_plano;
     double vel_subida;
     double vel_descida;
-    pthread_mutex_t mutex;
 
     int ponto_verde;
     int ponto_branco_vermelho;
+
+    char terminou_ciclo;
+    char continua_ciclo;
 };
 typedef struct Ciclista *ciclista;
  
@@ -107,8 +109,6 @@ int largura_estrada;
 int tamanho_estrada;
 char modo_simula;
 list trechos;
-pthread_cond_t ciclo_cond;
-pthread_mutex_t ciclo_mutex;
 
 /* Em particular, lista de ranking da camisa amarela. */
 pthread_mutex_t terminar_mutex;
@@ -128,7 +128,6 @@ void* CiclistaThread(void* arg) {
     ciclista c = (ciclista) arg;
     double vel;
 
-    pthread_mutex_lock(&c->mutex);
     /* Ciclista ja terminou a corrida. Nao corre mais poar. */
     while(c->km < tamanho_estrada) {
         if(modo_simula) {
@@ -219,13 +218,10 @@ void* CiclistaThread(void* arg) {
                 c->metros = 1000;
             }
         }
-        pthread_mutex_unlock(&c->mutex);
-        pthread_mutex_lock(&ciclo_mutex);
-        pthread_cond_wait(&ciclo_cond, &ciclo_mutex);
-        pthread_mutex_unlock(&ciclo_mutex);
-        pthread_mutex_lock(&c->mutex);
+        c->terminou_ciclo = 1;
+        while(c->continua_ciclo != 1);
+        c->continua_ciclo = 0;
     }
-    pthread_mutex_unlock(&c->mutex);
     return NULL;
 }
 
@@ -249,15 +245,16 @@ ciclista NewCiclista(int id) {
         c->vel_subida  = randRange(20.0, 80.0);
     } else 
         c->vel_descida = c->vel_plano = c->vel_subida = 50.0;
-    pthread_mutex_init(&c->mutex, NULL);
     c->ponto_verde = 0;
     c->ponto_branco_vermelho = 0;
+    c->terminou_ciclo = 0;
+    c->continua_ciclo = 0;
     return c;
 }
 
 void dumpCiclista(void* val) {
     ciclista c = (ciclista) val;
-    printf("[%s %.2d] ", c->nome, c->id);
+    printf("[%s %.2d; %.2lf m] ", c->nome, c->id, c->metros);
 }
  
 /* O grande main incomming. Se vira ae champz. */
@@ -271,7 +268,7 @@ int main(int argc, char **argv) {
 
     srand((unsigned int) time(NULL));
 
-    freopen("saida.txt", "w", stdout);
+    /*freopen("saida.txt", "w", stdout);*/
 
     if(argc != 2) { 
         fprintf(stderr, "Uso: %s arquivo\n", argv[0]); 
@@ -315,9 +312,6 @@ int main(int argc, char **argv) {
     ciclistas_terminaram = LISTinit();
     pthread_mutex_init(&terminar_mutex, NULL);
 
-    pthread_cond_init (&ciclo_cond, NULL);
-    pthread_mutex_init(&ciclo_mutex, NULL);
-
     trechos = LISTinit();
     while(!feof(in)) {
         char tipo;
@@ -347,8 +341,10 @@ int main(int argc, char **argv) {
     }
 
     while(1) {
-        for(i = 0; i < num_ciclistas; ++i)
-            pthread_mutex_lock(&ciclistas[i]->mutex);
+        for(i = 0; i < num_ciclistas; ++i) {
+            while(ciclistas[i]->terminou_ciclo != 1);
+            ciclistas[i]->terminou_ciclo = 0;
+        }
         /* Agora todos os ciclistas estão esperando o sinal. */
         
         if(ciclo % (60 / CICLO_TIME) == 0) {
@@ -364,11 +360,8 @@ int main(int argc, char **argv) {
         if(LISTsize(ciclistas_terminaram) == num_ciclistas)
             break;
         for(i = 0; i < num_ciclistas; ++i)
-            pthread_mutex_unlock(&ciclistas[i]->mutex);
-        pthread_cond_broadcast(&ciclo_cond);
+            ciclistas[i]->continua_ciclo = 1;
     }
-    for(i = 0; i < num_ciclistas; ++i)
-        pthread_mutex_unlock(&ciclistas[i]->mutex);
 
     puts("Ranking da Camisa Amarela:");
     LISTdump(ciclistas_terminaram, dumpCiclista);
@@ -421,7 +414,5 @@ int main(int argc, char **argv) {
         pthread_mutex_destroy(&estrada[i].mutex);
     }
     free(estrada);
-    pthread_mutex_destroy(&ciclo_mutex);
-    pthread_cond_destroy(&ciclo_cond);
     return 0;
 }
