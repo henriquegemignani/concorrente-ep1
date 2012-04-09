@@ -28,9 +28,11 @@ struct Ciclista {
     double vel_subida;
     double vel_descida;
     int tempo_gasto_total;
+    int numero_trecho_atual;
 
     int ponto_verde;
     int ponto_branco_vermelho;
+    int *tempo;
 
     sem_t terminou_ciclo;
     sem_t continua_ciclo;
@@ -141,10 +143,21 @@ struct KM* estrada;
 
 double kmh2ms(double kmh) { return kmh / 3.6; }
 
+int lessOperation(void *a1, void *a2) {
+    ciclista c1 = (ciclista) a1;
+    ciclista c2 = (ciclista) a2;
+    printf("Chegada no checkpoint %d: %d ,%d", c1->numero_trecho_atual, c1->tempo[c1->numero_trecho_atual], c2->tempo[c1->numero_trecho_atual] );
+    if (c1->tempo[c1->numero_trecho_atual] < c2->tempo[c1->numero_trecho_atual])
+        return 1;
+    else
+        return 0;
+}
+
 void* CiclistaThread(void* arg) {
-    /* This is our thread. There are many like it, this is one is ours. */
+    /* This is our thread. There are many like it, this one is ours. */
     ciclista c = (ciclista) arg;
     double vel;
+    int tempo_gasto_trecho_atual = 0;
 
     /* Ciclista ja terminou a corrida. Nao corre mais poar. */
     while(c->km < tamanho_estrada) {
@@ -164,6 +177,7 @@ void* CiclistaThread(void* arg) {
         }
 
         c->tempo_gasto_total += CICLO_TIME;
+        tempo_gasto_trecho_atual += CICLO_TIME;
         c->metros += kmh2ms(vel) * CICLO_TIME;
 
         /* Precisa mudar de KM? */
@@ -180,11 +194,14 @@ void* CiclistaThread(void* arg) {
 
                 /* Pega lock para se tirar da lista de quem tava no ultimo km. 
                     Esse lock também me permite modificar a lista do trecho, que termina nesse mesmo km. */
-                pthread_mutex_lock(  &estrada[c->km].mutex);
+                pthread_mutex_lock( &estrada[c->km].mutex);
                 LISTremove(estrada[c->km].ciclistas, c);
 
                 /* Eu certamente terminei o último trecho. */
-                LISTaddEnd(((trecho) trechos->last->val)->checkpoint_ranking, c);
+                c->tempo[c->numero_trecho_atual] = tempo_gasto_trecho_atual;
+                tempo_gasto_trecho_atual = 0;
+                LISTaddOrder(((trecho) trechos->last->val)->checkpoint_ranking, c, lessOperation);
+                (c->numero_trecho_atual)++;
 
                 pthread_mutex_unlock(&estrada[c->km].mutex);
 
@@ -213,7 +230,11 @@ void* CiclistaThread(void* arg) {
                         LISTremove(estrada[c->km].ciclistas, c);
                         if(c->kms_no_trecho == trecho_atual->distancia) {
                             /* Opa, terminei o meu trecho! :D */
-                            LISTaddEnd(trecho_atual->checkpoint_ranking, c);
+                            c->tempo[c->numero_trecho_atual] = tempo_gasto_trecho_atual;
+                            tempo_gasto_trecho_atual = 0;
+
+                            LISTaddOrder(trecho_atual->checkpoint_ranking, c, lessOperation);
+                            (c->numero_trecho_atual)++;
                             c->trecho_atual = c->trecho_atual->next;
                             c->kms_no_trecho = 0;
                         }
@@ -268,6 +289,7 @@ ciclista newCiclista(int id) {
     c->trecho_atual = NULL;
     c->kms_no_trecho = 0;
     c->tempo_gasto_total = 0;
+    c->numero_trecho_atual = 0;
 
     if(modo_simula) {
         c->vel_descida = randRange(20.0, 80.0);
@@ -365,8 +387,10 @@ int main(int argc, char **argv) {
     pthread_mutex_init(&terminar_mutex, NULL);
     modo_simula = modo_simula == 'A'; /* 0 se uniforme, 1 se diferente */
 
-    for(i = 0; i < num_ciclistas; ++i)
+    for(i = 0; i < num_ciclistas; ++i) {
         ciclistas[i] = newCiclista(i);
+        AUTOMALLOCV(ciclistas[i]->tempo, num_ciclistas);
+    }
 
     for(i = 0; i < num_ciclistas; ++i)
         printf("%s [%.2lf; %.2lf; %.2lf]\n", ciclistas[i]->nome, ciclistas[i]->vel_descida, ciclistas[i]->vel_plano, ciclistas[i]->vel_subida);
@@ -412,10 +436,12 @@ int main(int argc, char **argv) {
 
         /* Itera por todos os trechos, e distribui pontuação dos checkpoints. */
         litem p;
+        int i;
+        trecho t;
+        litem x;
+        int pos;
         for(p = trechos->first; p; p = p->next) {
-            trecho t = (trecho) p->val;
-            litem x;
-            int pos;
+            t = (trecho) p->val;
             /* Pega o primeiro, segundo e terceiro.
                 For conveniente que trata caso de menos de 3 ciclistas. */
             for(pos = 3, x = t->checkpoint_ranking->first; pos > 0 && x; --pos, x = x->next) {
@@ -425,7 +451,21 @@ int main(int argc, char **argv) {
                     ((ciclista) x->val)->ponto_branco_vermelho += pos;
             }
         }
+
+        i = 1;
+        for(p = trechos->first; p; p = p->next) {
+            printf("Ordem de chegada no trecho %d da corrida:\n", i);
+            t = (trecho) p->val;
+            for(x = t->checkpoint_ranking->first; x!=NULL; x = x->next) {
+                ciclista c1 = ((ciclista) x->val);
+                printf("\t%s - Tempo: %d:%.2d:%.2d\n", c1->nome, c1->tempo[i-1] / 3600, (c1->tempo[i-1] % 3600) / 60, c1->tempo[i-1] % 60 );
+            }
+            ++i;
+            puts("");
+        }
     }
+
+    puts("");
 
     quickSortCiclistaAmarelo(ciclistas, num_ciclistas);
     puts("Ranking da Camisa Amarela:");
@@ -453,8 +493,10 @@ int main(int argc, char **argv) {
     LISTcallback(trechos, destroyTrecho);
     LISTdestroy(trechos);
 
-    for(i = 0; i < num_ciclistas; ++i)
+    for(i = 0; i < num_ciclistas; ++i) {
+        free(ciclistas[i]->tempo);
         destroyCiclista(ciclistas[i]);
+    }
     free(ciclistas);
 
     pthread_attr_destroy(&ciclista_attr);

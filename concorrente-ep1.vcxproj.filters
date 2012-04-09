@@ -29,5 +29,11 @@
     <ClInclude Include="libs\LL.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="libs\pthread.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="libs\semaphore.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

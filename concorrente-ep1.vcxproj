@@ -68,6 +68,8 @@
   <ItemGroup>
     <ClInclude Include="libs\extra.h" />
     <ClInclude Include="libs\LL.h" />
+    <ClInclude Include="libs\pthread.h" />
+    <ClInclude Include="libs\semaphore.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
