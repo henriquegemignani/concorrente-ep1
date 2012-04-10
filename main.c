@@ -334,6 +334,8 @@ list readTrechos(FILE* in) {
     return resp;
 }
 
+int notas_posicao[6] = { 45, 35, 25, 15, 10, 5 };
+
 /* O grande main incomming. Se vira ae champz. */
 int main(int argc, char **argv) {
     int i;
@@ -444,11 +446,11 @@ int main(int argc, char **argv) {
             t = (trecho) p->val;
             /* Pega o primeiro, segundo e terceiro.
                 For conveniente que trata caso de menos de 3 ciclistas. */
-            for(pos = 3, x = t->checkpoint_ranking->first; pos > 0 && x; --pos, x = x->next) {
+            for(pos = 0, x = t->checkpoint_ranking->first; pos < 6 && x; ++pos, x = x->next) {
                 if(t->tipo == 'P')
-                    ((ciclista) x->val)->ponto_verde += pos;
+                    ((ciclista) x->val)->ponto_verde += notas_posicao[pos];
                 else if(t->tipo == 'S')
-                    ((ciclista) x->val)->ponto_branco_vermelho += pos;
+                    ((ciclista) x->val)->ponto_branco_vermelho += notas_posicao[pos];
             }
         }
 
