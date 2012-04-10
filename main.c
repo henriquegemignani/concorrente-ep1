@@ -146,7 +146,6 @@ double kmh2ms(double kmh) { return kmh / 3.6; }
 int lessOperation(void *a1, void *a2) {
     ciclista c1 = (ciclista) a1;
     ciclista c2 = (ciclista) a2;
-    printf("Chegada no checkpoint %d: %d ,%d", c1->numero_trecho_atual, c1->tempo[c1->numero_trecho_atual], c2->tempo[c1->numero_trecho_atual] );
     if (c1->tempo[c1->numero_trecho_atual] < c2->tempo[c1->numero_trecho_atual])
         return 1;
     else
