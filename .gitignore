@@ -3,3 +3,5 @@
 /Debug
 *.opensdf
 *.sdf
+*.suo
+/pthread_dll.dll

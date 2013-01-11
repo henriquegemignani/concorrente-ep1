@@ -1,38 +1,38 @@
-Nomes: Gustavo Teixeira da Cunha Coelho   N.USP: 6797334
+ï»¿Nomes: Gustavo Teixeira da Cunha Coelho   N.USP: 6797334
        Henrique Gemignani Passos Lima            6879634
 
 O algoritmo roda em ciclos de 5 segundos, definido pelo valor da 
 macro CICLO_TIME.
 
-O relatório tem o seguinte formato:
+O relatÃ³rio tem o seguinte formato:
 
-- Listagem de cada ciclista e suas três velocidades na ordem (D, P, S).
-- Listagem de cada minuto e ciclistas em cada kilometro até o final 
+- Listagem de cada ciclista e suas trÃªs velocidades na ordem (D, P, S).
+- Listagem de cada minuto e ciclistas em cada kilometro atÃ© o final 
   da corrida.
 - Listagem da chegada dos ciclistas nos checkpoints individuais em ordem 
   de tempo.
 - Listagem do ranking das camisetas amarela, verde e branco/vermelhas.
 
 
--- Questões deixadas em aberto --
+-- QuestÃµes deixadas em aberto --
 
-Atribuição de velocidades aleatórias:
+AtribuiÃ§Ã£o de velocidades aleatÃ³rias:
 
-A distribuição das velocidades aleatórias para os ciclistas é dada 
-por uma distribuição uniforme, sendo um valor escolhido dessa 
-distribuição para cada uma das 3 velocidades dos ciclistas, sendo 
+A distribuiÃ§Ã£o das velocidades aleatÃ³rias para os ciclistas Ã© dada 
+por uma distribuiÃ§Ã£o uniforme, sendo um valor escolhido dessa 
+distribuiÃ§Ã£o para cada uma das 3 velocidades dos ciclistas, sendo 
 feito isso para todos os ciclistas.
 
-Critério de desempate:
+CritÃ©rio de desempate:
 
-O ranking de desempate é:
+O ranking de desempate Ã©:
 
-- A escolha das camisetas amarelas é desempatada pelo ID dos ciclistas.
-- A escolha das camisetas verdes é desempatada pelas escolhas das 
+- A escolha das camisetas amarelas Ã© desempatada pelo ID dos ciclistas.
+- A escolha das camisetas verdes Ã© desempatada pelas escolhas das 
   camisetas amarelas.
-- A escolha das camisetas branco/vermelhas é desempatada pelas escolhas 
+- A escolha das camisetas branco/vermelhas Ã© desempatada pelas escolhas 
   das camisetas verdes.
 
-O desempate é tal por causa da existência de dois quicksorts, primeiro 
-para a ordenação para a distribuição das camisetas amarelas, depois das 
+O desempate Ã© tal por causa da existÃªncia de dois quicksorts, primeiro 
+para a ordenaÃ§Ã£o para a distribuiÃ§Ã£o das camisetas amarelas, depois das 
 camisetas verdes e depois das camisetas branco/vermelhas.
